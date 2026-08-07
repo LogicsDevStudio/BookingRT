@@ -9,7 +9,6 @@
 <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@500;600;700;800&family=Sarabun:wght@400;500;600;700&family=Bai+Jamjuree:wght@500;600&display=swap" rel="stylesheet">
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://unpkg.com/html5-qrcode"></script>
-<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
 <style>
   :root{
     --ink:#16261F;
@@ -452,25 +451,52 @@
     document.getElementById('btn-submit').disabled = false;
   }
 
-  function generateQrWithRetry(bookingId, attemptsLeft = 10){
+  // ลิสต์แหล่ง CDN ของไลบรารี QRCode เรียงตามลำดับที่จะลอง
+  // ใช้หลาย CDN (คนละโดเมน/คนละผู้ให้บริการ) เผื่อบางเครือข่ายบล็อกบางโดเมน
+  const QR_CDN_SOURCES = [
+    'https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js',
+    'https://unpkg.com/qrcode@1.5.3/build/qrcode.min.js',
+    'https://cdnjs.cloudflare.com/ajax/libs/qrcode/1.4.4/qrcode.min.js'
+  ];
+
+  let qrLibraryLoadPromise = null;
+
+  function loadQrLibrary(index = 0){
+    if (typeof QRCode !== 'undefined') return Promise.resolve();
+    if (index >= QR_CDN_SOURCES.length){
+      return Promise.reject(new Error('All QR CDN sources failed'));
+    }
+    return new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = QR_CDN_SOURCES[index];
+      script.onload = () => resolve();
+      script.onerror = () => {
+        script.remove();
+        console.warn('QR CDN failed, trying next source:', QR_CDN_SOURCES[index]);
+        loadQrLibrary(index + 1).then(resolve).catch(reject);
+      };
+      document.head.appendChild(script);
+    });
+  }
+
+  async function generateQrWithRetry(bookingId){
     const canvas = document.getElementById('rec-qr-canvas');
-    if (typeof QRCode !== 'undefined'){
+    try {
+      // โหลดแค่ครั้งเดียว ถ้ามี promise ค้างอยู่แล้วให้รอตัวเดิม
+      if (!qrLibraryLoadPromise) qrLibraryLoadPromise = loadQrLibrary();
+      await qrLibraryLoadPromise;
+
       QRCode.toCanvas(canvas, bookingId, { width: 190, margin: 1 }, function (err) {
         if (err) console.error('QR generate error:', err);
       });
-      return;
-    }
-    if (attemptsLeft > 0){
-      // library CDN อาจโหลดช้า ลองใหม่อีกครั้งใน 300ms
-      setTimeout(() => generateQrWithRetry(bookingId, attemptsLeft - 1), 300);
-      return;
-    }
-    // โหลดไลบรารีไม่สำเร็จจริงๆ (ถูกบล็อกโดยเน็ตเวิร์ก/ad-blocker) แสดงรหัสจองเป็นข้อความแทน ไม่ให้หน้าค้าง
-    console.error('QRCode library failed to load from CDN');
-    if (canvas){
-      canvas.outerHTML = `<div style="padding:16px;text-align:center;font-size:14px;color:#666;border:1px dashed #ccc;border-radius:8px;">
-        ไม่สามารถแสดง QR Code ได้ในขณะนี้<br>กรุณาใช้รหัสจองด้านบนแทน
-      </div>`;
+    } catch (e){
+      // ทุก CDN โหลดไม่สำเร็จจริงๆ (ถูกบล็อกโดยเน็ตเวิร์ก/ad-blocker) แสดงรหัสจองเป็นข้อความแทน ไม่ให้หน้าค้าง
+      console.error('QRCode library failed to load from all CDN sources', e);
+      if (canvas){
+        canvas.outerHTML = `<div style="padding:16px;text-align:center;font-size:14px;color:#666;border:1px dashed #ccc;border-radius:8px;">
+          ไม่สามารถแสดง QR Code ได้ในขณะนี้<br>กรุณาใช้รหัสจองด้านบนแทน
+        </div>`;
+      }
     }
   }
 
