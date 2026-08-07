@@ -452,6 +452,28 @@
     document.getElementById('btn-submit').disabled = false;
   }
 
+  function generateQrWithRetry(bookingId, attemptsLeft = 10){
+    const canvas = document.getElementById('rec-qr-canvas');
+    if (typeof QRCode !== 'undefined'){
+      QRCode.toCanvas(canvas, bookingId, { width: 190, margin: 1 }, function (err) {
+        if (err) console.error('QR generate error:', err);
+      });
+      return;
+    }
+    if (attemptsLeft > 0){
+      // library CDN อาจโหลดช้า ลองใหม่อีกครั้งใน 300ms
+      setTimeout(() => generateQrWithRetry(bookingId, attemptsLeft - 1), 300);
+      return;
+    }
+    // โหลดไลบรารีไม่สำเร็จจริงๆ (ถูกบล็อกโดยเน็ตเวิร์ก/ad-blocker) แสดงรหัสจองเป็นข้อความแทน ไม่ให้หน้าค้าง
+    console.error('QRCode library failed to load from CDN');
+    if (canvas){
+      canvas.outerHTML = `<div style="padding:16px;text-align:center;font-size:14px;color:#666;border:1px dashed #ccc;border-radius:8px;">
+        ไม่สามารถแสดง QR Code ได้ในขณะนี้<br>กรุณาใช้รหัสจองด้านบนแทน
+      </div>`;
+    }
+  }
+
   async function submitBooking(){
     const payload = {
       action: 'bookSeat',
@@ -473,9 +495,7 @@
       document.getElementById('rec-name').textContent = payload.fullName;
       document.getElementById('rec-seat').textContent = selectedSeat;
 
-      QRCode.toCanvas(document.getElementById('rec-qr-canvas'), res.bookingId, { width: 190, margin: 1 }, function (err) {
-        if (err) console.error('QR generate error:', err);
-      });
+      generateQrWithRetry(res.bookingId);
 
       document.getElementById('step-booking').classList.add('hidden');
       const successStep = document.getElementById('step-success');
