@@ -89,6 +89,8 @@
   .seat-btn.selected{ background: var(--brass); border-color: var(--brass-dark); color:#fff; transform: scale(1.06); box-shadow: 0 4px 10px -3px rgba(142,100,39,.6); }
   .seat-btn.booked{ background: #F1EAE3; border-color: var(--stone); color: var(--stone); cursor:not-allowed; opacity:.75; }
   .seat-btn.booked .seat-ico{ opacity:.5; }
+  .seat-btn.checked-in{ background: #F7E7E5; border-color: var(--ember); color: var(--ember-dark); cursor:not-allowed; opacity:.85; }
+  .seat-btn.checked-in .seat-ico{ opacity:.6; }
   .seat-skel{ aspect-ratio:1/1; border-radius:10px; background: linear-gradient(90deg, #ECE7D8 25%, #F5F1E5 37%, #ECE7D8 63%); background-size: 400% 100%; animation: shimmer 1.3s ease infinite; }
   @keyframes shimmer{ 0%{background-position:100% 0;} 100%{background-position:0 0;} }
 
@@ -196,6 +198,7 @@
             <span class="flex items-center gap-1 text-[var(--moss-dark)]"><i class="w-2.5 h-2.5 rounded-[3px] inline-block border border-[var(--moss)]"></i>ว่าง</span>
             <span class="flex items-center gap-1 text-[var(--brass-dark)]"><i class="w-2.5 h-2.5 rounded-[3px] inline-block bg-[var(--brass)]"></i>กำลังเลือก</span>
             <span class="flex items-center gap-1 text-[var(--stone)]"><i class="w-2.5 h-2.5 rounded-[3px] inline-block bg-[#F1EAE3] border border-[var(--stone)]"></i>จองแล้ว</span>
+            <span class="flex items-center gap-1 text-[var(--ember-dark)]"><i class="w-2.5 h-2.5 rounded-[3px] inline-block bg-[#F7E7E5] border border-[var(--ember)]"></i>เช็คอินแล้ว</span>
           </div>
         </div>
         <div id="seat-grid" class="grid grid-cols-5 gap-2">
@@ -375,6 +378,7 @@
     grid.innerHTML = `<p class="text-xs text-[var(--stone)] col-span-5 text-center py-4">${message}</p>`;
     document.getElementById('seat-hint').classList.add('hidden');
     selectedSeat = null;
+    selectedSeatLabel = null;
     selectedSeatBtn = null;
     document.getElementById('btn-submit').disabled = true;
   }
@@ -394,6 +398,7 @@
   async function onSlotChange(){
     const slotId = document.getElementById('select-slot').value;
     selectedSeat = null;
+    selectedSeatLabel = null;
     selectedSeatBtn = null;
     document.getElementById('btn-submit').disabled = true;
 
@@ -411,26 +416,46 @@
     else resetSeatGrid(res.message || 'ไม่สามารถโหลดผังที่นั่งได้');
   }
 
+  // ค่า SeatNo ที่เก็บจริงในชีต Bookings เป็นตัวเลขล้วน (เช่น "1", "2") ไม่ใช่ "A1" —
+  // ป้าย "A1" ที่เห็นบนปุ่มเป็นแค่ label ที่สร้างขึ้นฝั่ง client เพื่อความสวยงามเท่านั้น
+  // ห้ามนำ label นี้ไปเทียบกับข้อมูลจากเซิร์ฟเวอร์ หรือส่งกลับไปตอนจอง ต้องใช้ "เลขที่นั่งดิบ" (seatKey) เสมอ
+  // normSeatKey_ ป้องกันปัญหาเซลล์ในชีตถูกตั้งฟอร์แมตเป็น "อัตโนมัติ" แล้ว Sheets ส่งค่ามาเป็น Number แทน String
+  // (เทียบด้วย === ตรงๆ จะไม่ตรงกัน) — แปลงทุกอย่างเป็น string ที่ trim ช่องว่างแล้วก่อนเทียบเสมอ
+  function normSeatKey_(v){
+    if (v === null || v === undefined) return '';
+    return String(v).trim();
+  }
+
   function renderSeatGrid(res){
     const grid = document.getElementById('seat-grid');
     grid.innerHTML = '';
     const frag = document.createDocumentFragment();
     let availableCount = 0;
 
+    // รองรับทั้งรูปแบบใหม่ (confirmedSeats/checkedInSeats แยกกัน) และรูปแบบเก่า (bookedSeats รวม)
+    // เผื่อ backend เวอร์ชันเก่ายังไม่ส่ง field แยกมาให้
+    const confirmedSet = new Set((res.confirmedSeats || res.bookedSeats || []).map(normSeatKey_));
+    const checkedInSet = new Set((res.checkedInSeats || []).map(normSeatKey_));
+
     for (let i = 1; i <= res.maxSeats; i++){
-      const seatName = 'A' + i;
-      const isBooked = res.bookedSeats.includes(seatName);
-      if (!isBooked) availableCount++;
+      const seatKey = normSeatKey_(i);     // ค่าจริงที่ใช้เทียบ/ส่งกลับไปจอง ต้องตรงกับ SeatNo ในชีต
+      const seatLabel = 'A' + i;           // ป้ายแสดงผลเท่านั้น
+
+      const isCheckedIn = checkedInSet.has(seatKey);
+      const isConfirmed = !isCheckedIn && confirmedSet.has(seatKey);
+      const isUnavailable = isCheckedIn || isConfirmed;
+      if (!isUnavailable) availableCount++;
 
       const btn = document.createElement('button');
       btn.type = 'button';
-      btn.className = 'seat-btn ' + (isBooked ? 'booked' : 'available');
-      btn.innerHTML = `<span class="seat-ico">${isBooked ? '⛺' : '▲'}</span><span class="seat-code">${seatName}</span>`;
-      if (isBooked){
+      const stateClass = isCheckedIn ? 'checked-in' : (isConfirmed ? 'booked' : 'available');
+      btn.className = 'seat-btn ' + stateClass;
+      btn.innerHTML = `<span class="seat-ico">${isUnavailable ? '⛺' : '▲'}</span><span class="seat-code">${seatLabel}</span>`;
+      if (isUnavailable){
         btn.disabled = true;
-        btn.title = 'ที่นั่งนี้ถูกจองแล้ว';
+        btn.title = isCheckedIn ? 'ที่นั่งนี้เช็คอินเข้าฐานแล้ว' : 'ที่นั่งนี้ถูกจองไปแล้ว (ยังไม่เช็คอิน)';
       } else {
-        btn.onclick = () => selectSeat(btn, seatName);
+        btn.onclick = () => selectSeat(btn, seatKey, seatLabel);
       }
       frag.appendChild(btn);
     }
@@ -441,13 +466,16 @@
     hint.classList.remove('hidden');
   }
 
-  function selectSeat(btn, seatName){
+  let selectedSeatLabel = null; // ป้ายแสดงผล (เช่น "A1") สำหรับใบเสร็จ — ไม่ใช่ค่าที่ส่งไปเซิร์ฟเวอร์
+
+  function selectSeat(btn, seatKey, seatLabel){
     if (selectedSeatBtn) selectedSeatBtn.classList.remove('selected');
     if (selectedSeatBtn) selectedSeatBtn.classList.add('available');
     btn.classList.remove('available');
     btn.classList.add('selected');
     selectedSeatBtn = btn;
-    selectedSeat = seatName;
+    selectedSeat = seatKey;       // ค่าดิบที่ตรงกับ SeatNo ในชีต ใช้ตอนส่ง bookSeat
+    selectedSeatLabel = seatLabel;
     document.getElementById('btn-submit').disabled = false;
   }
 
@@ -519,7 +547,7 @@
     if (res.success){
       document.getElementById('rec-id').textContent = res.bookingId;
       document.getElementById('rec-name').textContent = payload.fullName;
-      document.getElementById('rec-seat').textContent = selectedSeat;
+      document.getElementById('rec-seat').textContent = selectedSeatLabel || selectedSeat;
 
       generateQrWithRetry(res.bookingId);
 
