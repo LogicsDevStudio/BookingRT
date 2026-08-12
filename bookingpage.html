@@ -182,17 +182,9 @@
         </select>
       </div>
 
-      <!-- Date Selection (ฐานหนึ่งอาจจัดหลายวัน แต่ละวันมีรอบไม่เหมือนกัน) -->
-      <div id="date-field-wrap" class="hidden">
-        <label class="block text-[11px] font-display font-bold text-[var(--forest)] mb-1 tracking-wide">3. เลือกวันที่</label>
-        <select id="select-date" onchange="onDateChange()" disabled class="field w-full p-2.5 border border-[var(--mist)] rounded-lg text-sm bg-white disabled:bg-slate-50 disabled:text-[var(--stone)]">
-          <option value="">-- เลือกวันที่ --</option>
-        </select>
-      </div>
-
       <!-- Slot Selection -->
       <div>
-        <label class="block text-[11px] font-display font-bold text-[var(--forest)] mb-1 tracking-wide">4. เลือกรอบเวลา</label>
+        <label class="block text-[11px] font-display font-bold text-[var(--forest)] mb-1 tracking-wide">3. เลือกรอบเวลา</label>
         <select id="select-slot" onchange="onSlotChange()" disabled class="field w-full p-2.5 border border-[var(--mist)] rounded-lg text-sm bg-white disabled:bg-slate-50 disabled:text-[var(--stone)]">
           <option value="">-- เลือกรอบเวลา --</option>
         </select>
@@ -201,7 +193,7 @@
       <!-- Seat Selection Map -->
       <div>
         <div class="flex items-center justify-between mb-2">
-          <label class="block text-[11px] font-display font-bold text-[var(--forest)] tracking-wide">5. ผังที่นั่ง</label>
+          <label class="block text-[11px] font-display font-bold text-[var(--forest)] tracking-wide">4. ผังที่นั่ง</label>
           <div class="flex items-center gap-2.5 text-[10px]" id="seat-legend">
             <span class="flex items-center gap-1 text-[var(--moss-dark)]"><i class="w-2.5 h-2.5 rounded-[3px] inline-block border border-[var(--moss)]"></i>ว่าง</span>
             <span class="flex items-center gap-1 text-[var(--brass-dark)]"><i class="w-2.5 h-2.5 rounded-[3px] inline-block bg-[var(--brass)]"></i>กำลังเลือก</span>
@@ -227,7 +219,6 @@
       <div class="bg-[var(--canvas)] p-4 rounded-xl text-left text-sm space-y-1.5 border border-[var(--mist)]">
         <p><span class="text-[var(--stone)]">Booking ID:</span> <b class="font-code" id="rec-id"></b></p>
         <p><span class="text-[var(--stone)]">ชื่อ:</span> <b id="rec-name"></b></p>
-        <p><span class="text-[var(--stone)]">วันที่/เวลา:</span> <b id="rec-datetime"></b></p>
         <p><span class="text-[var(--stone)]">ที่นั่ง:</span> <span class="font-code font-bold text-lg text-[var(--brass-dark)]" id="rec-seat"></span></p>
       </div>
       <div class="flex flex-col items-center gap-2 py-2">
@@ -240,13 +231,7 @@
   </div>
 
 <script>
-  // อ่านค่า apiUrl จาก query string ก่อนเสมอ — หน้า Admin (openBookingPortal) จะแนบ URL ของ
-  // Web App เวอร์ชันที่ deploy อยู่จริง ณ ขณะนั้นมาให้ทาง query string นี้ทุกครั้งที่กดเปิดหน้านี้
-  // (เดิมโค้ดจุดนี้มองข้าม query string ไปเลย ใช้ URL ที่ hardcode ไว้ตายตัวเสมอ ทำให้พอฝั่ง Admin
-  // มีการ deploy ใหม่/URL เปลี่ยน หน้านี้ก็ยังยิงไปหา URL เก่าอยู่ กลายเป็น "เชื่อมต่อเซิร์ฟเวอร์ไม่ได้")
-  // ค่า hardcode ด้านล่างนี้เก็บไว้เป็นค่า fallback สำหรับกรณีเปิดหน้านี้ตรงๆ โดยไม่ผ่านปุ่มจาก Admin เท่านั้น
-  const FALLBACK_API_URL = "https://script.google.com/a/macros/nmu.ac.th/s/AKfycbycMIp68Coi51JSZwX5lrpjd_8ecy_Qrkewx81o7j85nzR4WZgVaUYNnMSWlKvuhnBxCQ/exec";
-  const API_URL = new URLSearchParams(window.location.search).get('apiUrl') || FALLBACK_API_URL;
+  const API_URL = "https://script.google.com/macros/s/AKfycbycMIp68Coi51JSZwX5lrpjd_8ecy_Qrkewx81o7j85nzR4WZgVaUYNnMSWlKvuhnBxCQ/exec";
   const ADMIN_URL = API_URL;
 
   function backToAdmin(){ window.location.href = ADMIN_URL; }
@@ -366,94 +351,26 @@
     }
   }
 
-  // แปลง 'yyyy-MM-dd' เป็นวันที่แบบไทยอ่านง่าย (เช่น 12 ส.ค. 2569) — คืน '-' ถ้ายังไม่มีค่า
-  function formatThaiDate(dateStr){
-    if (!dateStr) return '-';
-    const m = String(dateStr).match(/^(\d{4})-(\d{2})-(\d{2})/);
-    if (!m) return dateStr;
-    const d = new Date(+m[1], +m[2] - 1, +m[3]);
-    return d.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric', weekday: 'short' });
-  }
-  function todayDateStr(){
-    const d = new Date();
-    const pad = n => String(n).padStart(2, '0');
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-  }
-
-  // เก็บรอบทั้งหมดของฐานที่เลือกไว้ (ทุกวันที่) เพื่อกรองตามวันที่ฝั่ง client โดยไม่ต้องยิง API ซ้ำ
-  let baseSlotsCache = [];
-
   async function onBaseChange(){
     const baseId = document.getElementById('select-base').value;
-    const dateWrap = document.getElementById('date-field-wrap');
-    const dateSel = document.getElementById('select-date');
     const slotSel = document.getElementById('select-slot');
-    dateSel.innerHTML = '<option value="">-- เลือกวันที่ --</option>';
-    dateSel.disabled = true;
-    dateWrap.classList.add('hidden');
     slotSel.innerHTML = '<option value="">-- เลือกรอบเวลา --</option>';
-    slotSel.disabled = true;
-    resetSeatGrid('กรุณาเลือกวันที่และรอบเวลาก่อน');
-    baseSlotsCache = [];
+    slotSel.disabled = !baseId;
+    resetSeatGrid('กรุณาเลือกรอบเวลาก่อน');
 
     if (!baseId) return;
 
     const res = await callAPI({ action: 'getSlots', baseId: baseId });
-    if (!res.success || !res.slots.length) return;
-    baseSlotsCache = res.slots;
-
-    // หาวันที่ที่มีรอบจริง เรียงจากเก่าไปใหม่ — รอบเก่าที่ยังไม่มีคอลัมน์วันที่ (date ว่าง) จัดกลุ่มเป็น "ไม่ระบุวันที่"
-    const dateSet = new Set(res.slots.map(s => s.date || ''));
-    const dates = Array.from(dateSet).sort((a, b) => {
-      if (!a) return 1;      // "ไม่ระบุวันที่" ไปอยู่ท้ายสุด
-      if (!b) return -1;
-      return a < b ? -1 : (a > b ? 1 : 0);
-    });
-
-    // ถ้ามีมากกว่า 1 วันที่ให้เลือก แสดงช่องวันที่ให้เลือกเอง — ถ้ามีวันเดียว ซ่อนไว้แล้วเลือกให้อัตโนมัติ (ไม่ต้องกดเพิ่ม)
-    if (dates.length > 1) dateWrap.classList.remove('hidden');
-
-    dateSel.innerHTML = dates.map(d =>
-      `<option value="${d}">${d ? escapeHtmlLocal(formatThaiDate(d)) : 'ไม่ระบุวันที่'}</option>`
-    ).join('');
-    dateSel.disabled = false;
-
-    // ค่าเริ่มต้น: วันนี้ถ้ามีรอบ, ไม่งั้นเอาวันถัดไปที่ใกล้ที่สุด (วันแรกในลิสต์ที่ >= วันนี้), ไม่งั้นเอาวันแรกสุดที่มี
-    const today = todayDateStr();
-    let defaultDate = dates.find(d => d === today);
-    if (!defaultDate) defaultDate = dates.find(d => d && d > today);
-    if (!defaultDate) defaultDate = dates[0];
-    dateSel.value = defaultDate;
-    onDateChange();
-  }
-
-  function escapeHtmlLocal(str){
-    return String(str === undefined || str === null ? '' : str)
-      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-  }
-
-  function onDateChange(){
-    const date = document.getElementById('select-date').value;
-    const slotSel = document.getElementById('select-slot');
-    slotSel.innerHTML = '<option value="">-- เลือกรอบเวลา --</option>';
-    resetSeatGrid('กรุณาเลือกรอบเวลาก่อน');
-
-    const matching = baseSlotsCache.filter(s => (s.date || '') === date);
-    if (!matching.length){
-      slotSel.disabled = true;
-      return;
-    }
-    slotSel.disabled = false;
-    const frag = document.createDocumentFragment();
-    matching
-      .sort((a, b) => (a.startTime || '').localeCompare(b.startTime || ''))
-      .forEach(s => {
+    if (res.success){
+      const frag = document.createDocumentFragment();
+      res.slots.forEach(s => {
         const opt = document.createElement('option');
         opt.value = s.slotId;
         opt.textContent = `รอบ ${s.startTime} - ${s.endTime}`;
         frag.appendChild(opt);
       });
-    slotSel.appendChild(frag);
+      slotSel.appendChild(frag);
+    }
   }
 
   function resetSeatGrid(message){
@@ -631,10 +548,6 @@
       document.getElementById('rec-id').textContent = res.bookingId;
       document.getElementById('rec-name').textContent = payload.fullName;
       document.getElementById('rec-seat').textContent = selectedSeatLabel || selectedSeat;
-      const pickedSlot = baseSlotsCache.find(s => s.slotId === payload.slotId);
-      document.getElementById('rec-datetime').textContent = pickedSlot
-        ? `${formatThaiDate(pickedSlot.date)} · ${pickedSlot.startTime} - ${pickedSlot.endTime}`
-        : '-';
 
       generateQrWithRetry(res.bookingId);
 
