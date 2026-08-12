@@ -215,11 +215,18 @@
     box.classList.remove('hidden');
 
     if (res.success){
+      const mismatchBanner = res.dateMismatch ? `
+        <div class="text-left text-xs font-semibold rounded-lg px-3 py-2.5 border" style="background:#FDF1D8;border-color:var(--brass);color:var(--brass-dark);">
+          ⚠ รอบนี้กำหนดไว้วันที่ ${escapeHtml(formatThaiDate(res.slotDate))} ไม่ใช่วันนี้ — โปรดตรวจสอบก่อนอนุญาตเข้าฐาน
+        </div>` : '';
       box.innerHTML = `
         <div class="mx-auto w-20 h-20 stamp flex items-center justify-center font-display font-extrabold text-2xl">✓</div>
         <h2 class="font-display text-xl font-bold text-[var(--moss-dark)]">${escapeHtml(res.message)}</h2>
+        ${mismatchBanner}
         <div class="bg-[var(--canvas)] p-4 rounded-xl text-left text-sm space-y-1.5 border border-[var(--mist)]">
           <p><span class="text-[var(--stone)]">ชื่อ:</span> <b>${escapeHtml(res.name)}</b></p>
+          <p><span class="text-[var(--stone)]">ฐาน:</span> <b>${escapeHtml(res.baseName)}</b></p>
+          <p><span class="text-[var(--stone)]">วันที่/เวลา:</span> <b>${escapeHtml(formatThaiDate(res.slotDate))} · ${escapeHtml(res.slotTime)}</b></p>
           <p><span class="text-[var(--stone)]">ที่นั่ง:</span> <span class="font-code font-bold text-lg text-[var(--brass-dark)]">${escapeHtml(res.seat)}</span></p>
         </div>
         <button onclick="scanNext()" class="w-full btn-dark text-white py-3 rounded-xl font-display font-bold">สแกนคนถัดไป</button>
@@ -247,6 +254,16 @@
   function escapeHtml(str){
     return String(str === undefined || str === null ? '' : str)
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  // แปลง 'yyyy-MM-dd' เป็นวันที่แบบไทยอ่านง่าย (เช่น 12 ส.ค. 2569) — คืน '-' ถ้ายังไม่มีค่า
+  // (รองรับรอบเก่าที่สร้างไว้ก่อนมีคอลัมน์วันที่) หรือคืนค่าดิบถ้ารูปแบบไม่ตรงตามที่คาด
+  function formatThaiDate(dateStr){
+    if (!dateStr) return '-';
+    const m = String(dateStr).match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (!m) return dateStr;
+    const d = new Date(+m[1], +m[2] - 1, +m[3]);
+    return d.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' });
   }
 
   async function callAPI(data, silent = false){
