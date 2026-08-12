@@ -240,7 +240,13 @@
   </div>
 
 <script>
-  const API_URL = "https://script.google.com/macros/s/AKfycbycMIp68Coi51JSZwX5lrpjd_8ecy_Qrkewx81o7j85nzR4WZgVaUYNnMSWlKvuhnBxCQ/exec";
+  // อ่านค่า apiUrl จาก query string ก่อนเสมอ — หน้า Admin (openBookingPortal) จะแนบ URL ของ
+  // Web App เวอร์ชันที่ deploy อยู่จริง ณ ขณะนั้นมาให้ทาง query string นี้ทุกครั้งที่กดเปิดหน้านี้
+  // (เดิมโค้ดจุดนี้มองข้าม query string ไปเลย ใช้ URL ที่ hardcode ไว้ตายตัวเสมอ ทำให้พอฝั่ง Admin
+  // มีการ deploy ใหม่/URL เปลี่ยน หน้านี้ก็ยังยิงไปหา URL เก่าอยู่ กลายเป็น "เชื่อมต่อเซิร์ฟเวอร์ไม่ได้")
+  // ค่า hardcode ด้านล่างนี้เก็บไว้เป็นค่า fallback สำหรับกรณีเปิดหน้านี้ตรงๆ โดยไม่ผ่านปุ่มจาก Admin เท่านั้น
+  const FALLBACK_API_URL = "https://script.google.com/macros/s/AKfycbycMIp68Coi51JSZwX5lrpjd_8ecy_Qrkewx81o7j85nzR4WZgVaUYNnMSWlKvuhnBxCQ/exec";
+  const API_URL = new URLSearchParams(window.location.search).get('apiUrl') || FALLBACK_API_URL;
   const ADMIN_URL = API_URL;
 
   function backToAdmin(){ window.location.href = ADMIN_URL; }
