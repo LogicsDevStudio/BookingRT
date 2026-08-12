@@ -3,12 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>จุดสแกน Check-in ฐานกิจกรรม</title>
+<title>ระบบจองรอบฐานกิจกรรม</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@500;600;700;800&family=Sarabun:wght@400;500;600;700&family=Bai+Jamjuree:wght@500;600&display=swap" rel="stylesheet">
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://unpkg.com/html5-qrcode"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
 <style>
   :root{
     --ink:#16261F;
@@ -38,17 +39,10 @@
   .font-display{ font-family:'Kanit',sans-serif; }
   .font-code{ font-family:'Bai Jamjuree',monospace; letter-spacing:.03em; }
 
-  .badge-ring{
-    background: conic-gradient(from 0deg, var(--brass), var(--moss), var(--brass));
-  }
+  .badge-ring{ background: conic-gradient(from 0deg, var(--brass), var(--moss), var(--brass)); }
 
   .viewfinder{ position:relative; }
-  .viewfinder::before, .viewfinder::after,
-  .vf-tl, .vf-br{ content:""; }
-  .vf-corner{
-    position:absolute; width:22px; height:22px; border-color: var(--brass);
-    z-index:10; pointer-events:none;
-  }
+  .vf-corner{ position:absolute; width:22px; height:22px; border-color: var(--brass); z-index:10; pointer-events:none; }
   .vf-tl{ top:8px; left:8px; border-top:3px solid; border-left:3px solid; border-radius:6px 0 0 0; }
   .vf-tr{ top:8px; right:8px; border-top:3px solid; border-right:3px solid; border-radius:0 6px 0 0; }
   .vf-bl{ bottom:8px; left:8px; border-bottom:3px solid; border-left:3px solid; border-radius:0 0 0 6px; }
@@ -59,48 +53,57 @@
     box-shadow: 0 3px 0 var(--moss-dark), 0 8px 18px -6px rgba(79,120,87,.55);
   }
   .btn-primary:active{ transform: translateY(2px); box-shadow: 0 1px 0 var(--moss-dark); }
-  .btn-dark{
-    background: linear-gradient(180deg, var(--forest), var(--forest-dark));
-    box-shadow: 0 3px 0 var(--forest-dark);
-  }
+  .btn-primary:disabled{ background: var(--stone); box-shadow:none; opacity:.6; }
+  .btn-dark{ background: linear-gradient(180deg, var(--forest), var(--forest-dark)); box-shadow: 0 3px 0 var(--forest-dark); }
   .btn-dark:active{ transform: translateY(2px); box-shadow: 0 1px 0 var(--forest-dark); }
+  .btn-ghost{ background: var(--canvas-card); border:1px solid var(--mist); color: var(--forest); }
 
   .spinner{ border:2.5px solid rgba(255,255,255,.35); border-top-color:#fff; border-radius:50%; width:16px; height:16px; animation: spin .7s linear infinite; }
   .spinner-dark{ border:3px solid rgba(36,70,58,.15); border-top-color: var(--forest); }
   @keyframes spin{ to{ transform: rotate(360deg); } }
 
-  .stamp{
-    border: 3px solid var(--moss-dark);
-    outline: 3px solid var(--moss-dark);
-    outline-offset: 4px;
-    border-radius: 9999px;
-    color: var(--moss-dark);
-    animation: stampIn .38s cubic-bezier(.2,1.4,.4,1) both;
-  }
-  .stamp.fail{ border-color: var(--ember-dark); outline-color: var(--ember-dark); color: var(--ember-dark); }
-  @keyframes stampIn{
-    0%{ transform: scale(1.6) rotate(-14deg); opacity:0; }
-    70%{ transform: scale(0.94) rotate(-8deg); opacity:1; }
-    100%{ transform: scale(1) rotate(-8deg); opacity:1; }
-  }
-  @media (prefers-reduced-motion: reduce){
-    .stamp{ animation: none; transform: rotate(-8deg); }
-    *{ transition: none !important; }
-  }
-
   .fade-in{ animation: fadeIn .25s ease both; }
   @keyframes fadeIn{ from{ opacity:0; transform: translateY(6px);} to{ opacity:1; transform:none; } }
+
+  /* Trail stepper */
+  .trail{ position:relative; }
+  .trail-line{ position:absolute; top:14px; left:28px; right:28px; height:2px; background-image: linear-gradient(to right, var(--mist) 60%, transparent 0); background-size: 10px 2px; background-repeat: repeat-x; z-index:0; }
+  .trail-node{ width:30px; height:30px; border-radius:9999px; display:flex; align-items:center; justify-content:center; font-family:'Bai Jamjuree',monospace; font-weight:700; font-size:12px; border:2px solid var(--mist); background:var(--canvas-card); color:var(--stone); position:relative; z-index:1; transition: all .25s ease; }
+  .trail-node.done{ background: var(--moss); border-color: var(--moss-dark); color:#fff; }
+  .trail-node.active{ background: var(--brass); border-color: var(--brass-dark); color:#fff; box-shadow: 0 0 0 4px rgba(184,134,59,.2); }
+
+  select.field{
+    appearance:none; -webkit-appearance:none;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%2324463A' stroke-width='2'><path d='M4 6l4 4 4-4'/></svg>");
+    background-repeat:no-repeat; background-position: right 12px center;
+  }
+
+  /* Seat map */
+  .seat-btn{
+    aspect-ratio: 1/1; border-radius:10px; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:2px; border:1.5px solid var(--mist); background:#fff; transition: all .15s ease; cursor:pointer;
+  }
+  .seat-btn .seat-ico{ font-size:13px; line-height:1; }
+  .seat-btn .seat-code{ font-family:'Bai Jamjuree',monospace; font-size:10px; font-weight:600; }
+  .seat-btn.available{ border-color: var(--moss); color: var(--moss-dark); }
+  .seat-btn.available:hover{ background: #F2F7F2; border-color: var(--moss-dark); transform: translateY(-1px); }
+  .seat-btn.selected{ background: var(--brass); border-color: var(--brass-dark); color:#fff; transform: scale(1.06); box-shadow: 0 4px 10px -3px rgba(142,100,39,.6); }
+  .seat-btn.booked{ background: #F1EAE3; border-color: var(--stone); color: var(--stone); cursor:not-allowed; opacity:.75; }
+  .seat-btn.booked .seat-ico{ opacity:.5; }
+  .seat-skel{ aspect-ratio:1/1; border-radius:10px; background: linear-gradient(90deg, #ECE7D8 25%, #F5F1E5 37%, #ECE7D8 63%); background-size: 400% 100%; animation: shimmer 1.3s ease infinite; }
+  @keyframes shimmer{ 0%{background-position:100% 0;} 100%{background-position:0 0;} }
+
+  @media (prefers-reduced-motion: reduce){ *{ transition:none !important; animation-duration:.01ms !important; } }
 
   #reader video{ border-radius: 12px; }
 </style>
 </head>
 <body>
 
-  <!-- Loading Overlay (เฉพาะช่วงตรวจสอบสำคัญ) -->
   <div id="loading-overlay" class="hidden fixed inset-0 bg-[#16261F]/55 backdrop-blur-sm flex flex-col items-center justify-center z-50">
     <div class="bg-[var(--canvas-card)] px-6 py-5 rounded-2xl shadow-2xl flex flex-col items-center gap-3">
       <div class="spinner spinner-dark w-9 h-9"></div>
-      <p class="text-sm font-semibold font-display text-[var(--forest)]">กำลังตรวจสอบข้อมูล...</p>
+      <p id="loading-text" class="text-sm font-semibold font-display text-[var(--forest)]">กำลังโหลดข้อมูล...</p>
     </div>
   </div>
 
@@ -115,8 +118,8 @@
           </div>
         </div>
         <div>
-          <h1 class="font-display font-bold text-lg text-white leading-tight">จุดสแกน Check-in</h1>
-          <p class="text-[11px] text-[#C9D6CC] font-code">CHECKPOINT · ฐานกิจกรรม</p>
+          <h1 class="font-display font-bold text-lg text-white leading-tight">จองรอบฐานกิจกรรม</h1>
+          <p class="text-[11px] text-[#C9D6CC] font-code">FIELD BOOKING · เลือกฐานและที่นั่ง</p>
         </div>
       </div>
       <div class="px-5 pb-3">
@@ -124,46 +127,143 @@
       </div>
     </header>
 
-    <!-- Scanner -->
+    <!-- Trail stepper -->
+    <div class="trail flex justify-between px-2 pt-1">
+      <div class="trail-line"></div>
+      <div class="flex flex-col items-center gap-1">
+        <div id="tn-1" class="trail-node active">1</div>
+        <span class="text-[10px] text-[var(--forest)] font-display">สแกน</span>
+      </div>
+      <div class="flex flex-col items-center gap-1">
+        <div id="tn-2" class="trail-node">2</div>
+        <span class="text-[10px] text-[var(--stone)] font-display">เลือกรายการ</span>
+      </div>
+      <div class="flex flex-col items-center gap-1">
+        <div id="tn-3" class="trail-node">3</div>
+        <span class="text-[10px] text-[var(--stone)] font-display">เสร็จสิ้น</span>
+      </div>
+    </div>
+
+    <!-- STEP 1: Scan QR Code -->
     <div id="step-scan" class="fade-in bg-[var(--canvas-card)] p-4 rounded-2xl shadow-md space-y-4 border border-[var(--mist)]">
-      <h2 class="font-display font-semibold text-center text-[var(--forest)] text-sm tracking-wide">สแกน QR CODE ใบจอง</h2>
+      <h2 class="font-display font-semibold text-center text-[var(--forest)] text-sm tracking-wide">สแกน QR CODE ประจำตัว</h2>
       <div class="viewfinder rounded-xl overflow-hidden bg-black">
         <div id="reader"></div>
-        <div class="vf-corner vf-tl"></div>
-        <div class="vf-corner vf-tr"></div>
-        <div class="vf-corner vf-bl"></div>
-        <div class="vf-corner vf-br"></div>
+        <div class="vf-corner vf-tl"></div><div class="vf-corner vf-tr"></div>
+        <div class="vf-corner vf-bl"></div><div class="vf-corner vf-br"></div>
       </div>
       <div class="text-center">
-        <p class="text-xs text-[var(--stone)] mb-2">หรือกรอกรหัสการจองด้วยตนเอง</p>
+        <p class="text-xs text-[var(--stone)] mb-2">หรือกรอกรหัสประจำตัว/บัตรประชาชน</p>
         <div class="flex gap-2">
-          <input type="text" id="manual-booking-id" placeholder="BK-xxxxxxxxxx"
+          <input type="text" id="manual-pid" placeholder="กรอกรหัส PID/NationalID"
             class="flex-1 p-2.5 border border-[var(--mist)] rounded-lg text-sm font-code bg-white focus:outline-none focus:ring-2 focus:ring-[var(--brass)]/50 focus:border-[var(--brass)]">
-          <button id="btn-manual" onclick="manualCheckIn()"
-            class="btn-primary text-white px-4 py-2.5 rounded-lg text-sm font-display font-bold flex items-center gap-2">
-            <span>ยืนยัน</span>
-          </button>
+          <button id="btn-search" onclick="manualSearch()" class="btn-primary text-white px-4 py-2.5 rounded-lg text-sm font-display font-bold">ค้นหา</button>
         </div>
       </div>
     </div>
 
-    <!-- Result -->
-    <div id="checkin-result" class="hidden fade-in bg-[var(--canvas-card)] p-6 rounded-2xl shadow-md text-center space-y-4 border border-[var(--mist)]"></div>
+    <!-- STEP 2: Select Base / Slot / Seat -->
+    <div id="step-booking" class="hidden bg-[var(--canvas-card)] p-5 rounded-2xl shadow-md space-y-5 border border-[var(--mist)]">
+      <!-- User Info Card -->
+      <div class="rounded-xl p-3.5 flex items-center gap-3" style="background: linear-gradient(135deg, #EFF6F0, #F7F4E8); border:1px solid var(--mist);">
+        <div class="w-10 h-10 rounded-full bg-[var(--forest)] flex items-center justify-center text-white font-display font-bold text-sm shrink-0" id="u-avatar">--</div>
+        <div class="min-w-0">
+          <p class="font-display font-bold text-[var(--forest)] truncate" id="u-name">-</p>
+          <p class="text-[11px] text-[var(--stone)] font-code">ID <span id="u-id"></span> · <span class="text-[var(--brass-dark)] font-bold">คะแนน <span id="u-points"></span></span></p>
+        </div>
+      </div>
+
+      <!-- Base Selection -->
+      <div>
+        <label class="block text-[11px] font-display font-bold text-[var(--forest)] mb-1 tracking-wide">2. เลือกฐานกิจกรรม</label>
+        <select id="select-base" onchange="onBaseChange()" class="field w-full p-2.5 border border-[var(--mist)] rounded-lg text-sm bg-white">
+          <option value="">-- เลือกฐาน --</option>
+        </select>
+      </div>
+
+      <!-- Slot Selection -->
+      <div>
+        <label class="block text-[11px] font-display font-bold text-[var(--forest)] mb-1 tracking-wide">3. เลือกรอบเวลา</label>
+        <select id="select-slot" onchange="onSlotChange()" disabled class="field w-full p-2.5 border border-[var(--mist)] rounded-lg text-sm bg-white disabled:bg-slate-50 disabled:text-[var(--stone)]">
+          <option value="">-- เลือกรอบเวลา --</option>
+        </select>
+      </div>
+
+      <!-- Seat Selection Map -->
+      <div>
+        <div class="flex items-center justify-between mb-2">
+          <label class="block text-[11px] font-display font-bold text-[var(--forest)] tracking-wide">4. ผังที่นั่ง</label>
+          <div class="flex items-center gap-2.5 text-[10px]" id="seat-legend">
+            <span class="flex items-center gap-1 text-[var(--moss-dark)]"><i class="w-2.5 h-2.5 rounded-[3px] inline-block border border-[var(--moss)]"></i>ว่าง</span>
+            <span class="flex items-center gap-1 text-[var(--brass-dark)]"><i class="w-2.5 h-2.5 rounded-[3px] inline-block bg-[var(--brass)]"></i>กำลังเลือก</span>
+            <span class="flex items-center gap-1 text-[var(--stone)]"><i class="w-2.5 h-2.5 rounded-[3px] inline-block bg-[#F1EAE3] border border-[var(--stone)]"></i>จองแล้ว</span>
+          </div>
+        </div>
+        <div id="seat-grid" class="grid grid-cols-5 gap-2">
+          <p class="text-xs text-[var(--stone)] col-span-5 text-center py-4">กรุณาเลือกรอบเวลาก่อน</p>
+        </div>
+        <p id="seat-hint" class="text-[11px] text-[var(--stone)] mt-2 text-center hidden"></p>
+      </div>
+
+      <button onclick="submitBooking()" id="btn-submit" disabled class="w-full btn-primary text-white py-3.5 rounded-xl font-display font-bold flex items-center justify-center gap-2">
+        <span>ยืนยันการจองที่นั่ง</span>
+      </button>
+    </div>
+
+    <!-- STEP 3: Success Receipt -->
+    <div id="step-success" class="hidden fade-in bg-[var(--canvas-card)] p-6 rounded-2xl shadow-md text-center space-y-4 border border-[var(--mist)]">
+      <div class="w-16 h-16 mx-auto rounded-full flex items-center justify-center text-3xl font-bold text-white" style="background: linear-gradient(180deg, var(--moss), var(--moss-dark));">✓</div>
+      <h2 class="font-display text-xl font-bold text-[var(--forest)]">จองที่นั่งสำเร็จ!</h2>
+      <div class="bg-[var(--canvas)] p-4 rounded-xl text-left text-sm space-y-1.5 border border-[var(--mist)]">
+        <p><span class="text-[var(--stone)]">Booking ID:</span> <b class="font-code" id="rec-id"></b></p>
+        <p><span class="text-[var(--stone)]">ชื่อ:</span> <b id="rec-name"></b></p>
+        <p><span class="text-[var(--stone)]">ที่นั่ง:</span> <span class="font-code font-bold text-lg text-[var(--brass-dark)]" id="rec-seat"></span></p>
+      </div>
+      <div class="flex flex-col items-center gap-2 py-2">
+        <div class="p-2 bg-white rounded-xl border border-[var(--mist)]"><canvas id="rec-qr-canvas"></canvas></div>
+        <p class="text-xs text-[var(--stone)]">แสดง QR นี้ที่จุด Check-in หน้างาน</p>
+      </div>
+      <button onclick="location.reload()" class="w-full btn-dark text-white py-3 rounded-xl font-display font-bold">จองรายการถัดไป</button>
+      <button onclick="backToAdmin()" class="w-full btn-ghost py-2.5 rounded-xl font-display font-semibold text-sm">กลับสู่ระบบหลังบ้าน</button>
+    </div>
   </div>
 
 <script>
-  // อ่านค่า apiUrl จาก query string ก่อนเสมอ — หน้า Admin (openCheckinPortal) จะแนบ URL ของ
-  // Web App เวอร์ชันที่ deploy อยู่จริง ณ ขณะนั้นมาให้ทาง query string นี้ทุกครั้งที่กดเปิดหน้านี้
-  // (เดิมโค้ดจุดนี้มองข้ามค่าที่ Admin ส่งมา ใช้ URL ที่ hardcode ไว้ตายตัวเสมอ)
-  const FALLBACK_API_URL = "https://script.google.com/a/macros/nmu.ac.th/s/AKfycbycMIp68Coi51JSZwX5lrpjd_8ecy_Qrkewx81o7j85nzR4WZgVaUYNnMSWlKvuhnBxCQ/exec";
-  const API_URL = new URLSearchParams(window.location.search).get('apiUrl') || FALLBACK_API_URL;
+  const API_URL = "https://script.google.com/macros/s/AKfycbycMIp68Coi51JSZwX5lrpjd_8ecy_Qrkewx81o7j85nzR4WZgVaUYNnMSWlKvuhnBxCQ/exec";
   const ADMIN_URL = API_URL;
 
   function backToAdmin(){ window.location.href = ADMIN_URL; }
 
-  function toggleLoading(show){
+  let userData = null;
+  let selectedSeat = null;
+  let selectedSeatBtn = null;
+
+  // [Perf] preload bases silently as soon as the page opens
+  let basesCache = null;
+  let basesPromise = null;
+  function preloadBases(){
+    basesPromise = callAPI({ action: 'getBases' }, true).then(res => {
+      if (res.success) basesCache = res.bases;
+      return res;
+    });
+  }
+  preloadBases();
+
+  // [Perf] cache seats per slot so re-visiting a slot doesn't refetch
+  const seatsCache = new Map();
+
+  const html5QrCode = new Html5Qrcode("reader");
+  function startScanner(){
+    html5QrCode.start({ facingMode: "environment" }, { fps: 12, qrbox: 200, aspectRatio: 1.0 }, onScanSuccess)
+      .catch(err => console.log("กล้องไม่สามารถใช้งานได้ หรือยังไม่ได้อนุญาตสิทธิ์:", err));
+  }
+  startScanner();
+
+  function toggleLoading(show, text){
     const el = document.getElementById('loading-overlay');
-    if (el) el.classList.toggle('hidden', !show);
+    if (!el) return;
+    if (text) document.getElementById('loading-text').textContent = text;
+    el.classList.toggle('hidden', !show);
   }
 
   function setButtonBusy(btn, busy, label){
@@ -178,16 +278,14 @@
     }
   }
 
-  // Initialize QR Scanner
-  const html5QrCode = new Html5Qrcode("reader");
-  function startScanner(){
-    html5QrCode.start(
-      { facingMode: "environment" },
-      { fps: 12, qrbox: 220, aspectRatio: 1.0 },
-      onScanSuccess
-    ).catch(err => console.log("กล้องไม่สามารถใช้งานได้ หรือยังไม่ได้อนุญาตสิทธิ์:", err));
+  function setTrail(step){
+    for (let i = 1; i <= 3; i++){
+      const n = document.getElementById('tn-' + i);
+      n.classList.remove('active','done');
+      if (i < step) n.classList.add('done');
+      else if (i === step) n.classList.add('active');
+    }
   }
-  startScanner();
 
   function stopCamera(){
     if (html5QrCode && html5QrCode.isScanning){
@@ -195,79 +293,201 @@
     }
   }
 
-  function onScanSuccess(decodedText){
-    stopCamera();
-    document.getElementById('step-scan').classList.add('hidden');
-    runCheckIn(decodedText);
-  }
+  function onScanSuccess(decodedText){ stopCamera(); fetchUser(decodedText); }
 
-  function manualCheckIn(){
-    const input = document.getElementById('manual-booking-id');
+  function manualSearch(){
+    const input = document.getElementById('manual-pid');
     const val = input.value.trim();
     if (!val){ input.focus(); return; }
     stopCamera();
-    document.getElementById('step-scan').classList.add('hidden');
-    runCheckIn(val);
+    fetchUser(val);
   }
-  document.getElementById('manual-booking-id').addEventListener('keydown', e => {
-    if (e.key === 'Enter') manualCheckIn();
-  });
+  document.getElementById('manual-pid').addEventListener('keydown', e => { if (e.key === 'Enter') manualSearch(); });
 
-  async function runCheckIn(bookingId){
-    const res = await callAPI({ action: 'checkInBooking', bookingId: bookingId });
-    const box = document.getElementById('checkin-result');
-    box.classList.remove('hidden');
+  async function fetchUser(pid){
+    const btn = document.getElementById('btn-search');
+    setButtonBusy(btn, true, 'กำลังค้นหา');
+    const res = await callAPI({ action: 'getParticipant', pid: pid });
+    setButtonBusy(btn, false);
 
     if (res.success){
-      const mismatchBanner = res.dateMismatch ? `
-        <div class="text-left text-xs font-semibold rounded-lg px-3 py-2.5 border" style="background:#FDF1D8;border-color:var(--brass);color:var(--brass-dark);">
-          ⚠ รอบนี้กำหนดไว้วันที่ ${escapeHtml(formatThaiDate(res.slotDate))} ไม่ใช่วันนี้ — โปรดตรวจสอบก่อนอนุญาตเข้าฐาน
-        </div>` : '';
-      box.innerHTML = `
-        <div class="mx-auto w-20 h-20 stamp flex items-center justify-center font-display font-extrabold text-2xl">✓</div>
-        <h2 class="font-display text-xl font-bold text-[var(--moss-dark)]">${escapeHtml(res.message)}</h2>
-        ${mismatchBanner}
-        <div class="bg-[var(--canvas)] p-4 rounded-xl text-left text-sm space-y-1.5 border border-[var(--mist)]">
-          <p><span class="text-[var(--stone)]">ชื่อ:</span> <b>${escapeHtml(res.name)}</b></p>
-          <p><span class="text-[var(--stone)]">ฐาน:</span> <b>${escapeHtml(res.baseName)}</b></p>
-          <p><span class="text-[var(--stone)]">วันที่/เวลา:</span> <b>${escapeHtml(formatThaiDate(res.slotDate))} · ${escapeHtml(res.slotTime)}</b></p>
-          <p><span class="text-[var(--stone)]">ที่นั่ง:</span> <span class="font-code font-bold text-lg text-[var(--brass-dark)]">${escapeHtml(res.seat)}</span></p>
-        </div>
-        <button onclick="scanNext()" class="w-full btn-dark text-white py-3 rounded-xl font-display font-bold">สแกนคนถัดไป</button>
-      `;
+      userData = res.participant;
+      const initials = ((userData.firstName || '?')[0] || '?') + ((userData.lastName || '')[0] || '');
+      document.getElementById('u-avatar').textContent = initials.toUpperCase();
+      document.getElementById('u-name').textContent = `${userData.firstName} ${userData.lastName}`;
+      document.getElementById('u-id').textContent = userData.id;
+      document.getElementById('u-points').textContent = userData.points;
+
+      document.getElementById('step-scan').classList.add('hidden');
+      const bookingStep = document.getElementById('step-booking');
+      bookingStep.classList.remove('hidden');
+      bookingStep.classList.add('fade-in');
+      setTrail(2);
+      loadBases();
     } else {
-      box.innerHTML = `
-        <div class="mx-auto w-20 h-20 stamp fail flex items-center justify-center font-display font-extrabold text-2xl">✕</div>
-        <h2 class="font-display text-lg font-bold text-[var(--ember-dark)]">${escapeHtml(res.message)}</h2>
-        <button onclick="scanNext()" class="w-full btn-dark text-white py-3 rounded-xl font-display font-bold">ลองใหม่อีกครั้ง</button>
-      `;
+      alert(res.message);
+      startScanner();
     }
   }
 
-  function scanNext(){
-    const box = document.getElementById('checkin-result');
-    box.classList.add('hidden');
-    box.innerHTML = '';
-    document.getElementById('manual-booking-id').value = '';
-    const step = document.getElementById('step-scan');
-    step.classList.remove('hidden');
-    step.classList.add('fade-in');
-    startScanner();
+  async function loadBases(){
+    let res;
+    if (basesCache) res = { success: true, bases: basesCache };
+    else if (basesPromise) res = await basesPromise;
+    else res = await callAPI({ action: 'getBases' });
+
+    if (res.success){
+      const sel = document.getElementById('select-base');
+      const frag = document.createDocumentFragment();
+      res.bases.forEach(b => {
+        const opt = document.createElement('option');
+        opt.value = b.baseId;
+        opt.textContent = `${b.baseName} (${b.location})`;
+        frag.appendChild(opt);
+      });
+      sel.appendChild(frag);
+    }
   }
 
-  function escapeHtml(str){
-    return String(str === undefined || str === null ? '' : str)
-      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  async function onBaseChange(){
+    const baseId = document.getElementById('select-base').value;
+    const slotSel = document.getElementById('select-slot');
+    slotSel.innerHTML = '<option value="">-- เลือกรอบเวลา --</option>';
+    slotSel.disabled = !baseId;
+    resetSeatGrid('กรุณาเลือกรอบเวลาก่อน');
+
+    if (!baseId) return;
+
+    const res = await callAPI({ action: 'getSlots', baseId: baseId });
+    if (res.success){
+      const frag = document.createDocumentFragment();
+      res.slots.forEach(s => {
+        const opt = document.createElement('option');
+        opt.value = s.slotId;
+        opt.textContent = `รอบ ${s.startTime} - ${s.endTime}`;
+        frag.appendChild(opt);
+      });
+      slotSel.appendChild(frag);
+    }
   }
 
-  // แปลง 'yyyy-MM-dd' เป็นวันที่แบบไทยอ่านง่าย (เช่น 12 ส.ค. 2569) — คืน '-' ถ้ายังไม่มีค่า
-  // (รองรับรอบเก่าที่สร้างไว้ก่อนมีคอลัมน์วันที่) หรือคืนค่าดิบถ้ารูปแบบไม่ตรงตามที่คาด
-  function formatThaiDate(dateStr){
-    if (!dateStr) return '-';
-    const m = String(dateStr).match(/^(\d{4})-(\d{2})-(\d{2})/);
-    if (!m) return dateStr;
-    const d = new Date(+m[1], +m[2] - 1, +m[3]);
-    return d.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' });
+  function resetSeatGrid(message){
+    const grid = document.getElementById('seat-grid');
+    grid.innerHTML = `<p class="text-xs text-[var(--stone)] col-span-5 text-center py-4">${message}</p>`;
+    document.getElementById('seat-hint').classList.add('hidden');
+    selectedSeat = null;
+    selectedSeatBtn = null;
+    document.getElementById('btn-submit').disabled = true;
+  }
+
+  function renderSeatSkeleton(count){
+    const grid = document.getElementById('seat-grid');
+    grid.innerHTML = '';
+    const frag = document.createDocumentFragment();
+    for (let i = 0; i < count; i++){
+      const s = document.createElement('div');
+      s.className = 'seat-skel';
+      frag.appendChild(s);
+    }
+    grid.appendChild(frag);
+  }
+
+  async function onSlotChange(){
+    const slotId = document.getElementById('select-slot').value;
+    selectedSeat = null;
+    selectedSeatBtn = null;
+    document.getElementById('btn-submit').disabled = true;
+
+    if (!slotId){ resetSeatGrid('กรุณาเลือกรอบเวลาก่อน'); return; }
+
+    renderSeatSkeleton(10);
+
+    let res = seatsCache.get(slotId);
+    if (!res){
+      res = await callAPI({ action: 'getSeats', slotId: slotId });
+      if (res.success) seatsCache.set(slotId, res);
+    }
+
+    if (res.success) renderSeatGrid(res);
+    else resetSeatGrid(res.message || 'ไม่สามารถโหลดผังที่นั่งได้');
+  }
+
+  function renderSeatGrid(res){
+    const grid = document.getElementById('seat-grid');
+    grid.innerHTML = '';
+    const frag = document.createDocumentFragment();
+    let availableCount = 0;
+
+    for (let i = 1; i <= res.maxSeats; i++){
+      const seatName = 'A' + i;
+      const isBooked = res.bookedSeats.includes(seatName);
+      if (!isBooked) availableCount++;
+
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'seat-btn ' + (isBooked ? 'booked' : 'available');
+      btn.innerHTML = `<span class="seat-ico">${isBooked ? '⛺' : '▲'}</span><span class="seat-code">${seatName}</span>`;
+      if (isBooked){
+        btn.disabled = true;
+        btn.title = 'ที่นั่งนี้ถูกจองแล้ว';
+      } else {
+        btn.onclick = () => selectSeat(btn, seatName);
+      }
+      frag.appendChild(btn);
+    }
+    grid.appendChild(frag);
+
+    const hint = document.getElementById('seat-hint');
+    hint.textContent = `ว่าง ${availableCount} จากทั้งหมด ${res.maxSeats} ที่นั่ง`;
+    hint.classList.remove('hidden');
+  }
+
+  function selectSeat(btn, seatName){
+    if (selectedSeatBtn) selectedSeatBtn.classList.remove('selected');
+    if (selectedSeatBtn) selectedSeatBtn.classList.add('available');
+    btn.classList.remove('available');
+    btn.classList.add('selected');
+    selectedSeatBtn = btn;
+    selectedSeat = seatName;
+    document.getElementById('btn-submit').disabled = false;
+  }
+
+  async function submitBooking(){
+    const payload = {
+      action: 'bookSeat',
+      userId: userData.id,
+      nationalId: userData.nationalId,
+      fullName: `${userData.firstName} ${userData.lastName}`,
+      baseId: document.getElementById('select-base').value,
+      slotId: document.getElementById('select-slot').value,
+      seatNo: selectedSeat
+    };
+
+    const btn = document.getElementById('btn-submit');
+    setButtonBusy(btn, true, 'กำลังยืนยัน');
+    const res = await callAPI(payload);
+    setButtonBusy(btn, false);
+
+    if (res.success){
+      document.getElementById('rec-id').textContent = res.bookingId;
+      document.getElementById('rec-name').textContent = payload.fullName;
+      document.getElementById('rec-seat').textContent = selectedSeat;
+
+      QRCode.toCanvas(document.getElementById('rec-qr-canvas'), res.bookingId, { width: 190, margin: 1 }, function (err) {
+        if (err) console.error('QR generate error:', err);
+      });
+
+      document.getElementById('step-booking').classList.add('hidden');
+      const successStep = document.getElementById('step-success');
+      successStep.classList.remove('hidden');
+      successStep.classList.add('fade-in');
+      setTrail(3);
+
+      // invalidate cache for this slot since a seat was just taken
+      seatsCache.delete(payload.slotId);
+    } else {
+      alert(res.message);
+    }
   }
 
   async function callAPI(data, silent = false){
